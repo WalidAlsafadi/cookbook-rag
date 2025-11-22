@@ -1,0 +1,39 @@
+# ---- Python (backend) ----
+backend/.venv/
+backend/__pycache__/
+backend/**/*.pyc
+backend/.pytest_cache/
+backend/.mypy_cache/
+
+# Logs
+backend/*.log
+
+# ---- Env / secrets ----
+.env
+*.env
+backend/.env
+
+# ---- Vector store & generated data ----
+backend/vectorstore/
+backend/data/processed/
+backend/data/**/*.jsonl
+
+# ---- Node / frontend ----
+frontend/node_modules/
+frontend/.next/
+frontend/.turbo/
+frontend/dist/
+frontend/build/
+
+# Env for frontend
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+
+.vscode/
+.idea/
+*.swp

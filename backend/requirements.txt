@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+
+# LangChain + wrappers
+langchain
+langchain-community
+langchain-openai
+langchain-text-splitters
+
+# Vector store + utils
+chromadb
+python-dotenv
+pypdf
