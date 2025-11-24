@@ -30,6 +30,10 @@ frontend/.env
 frontend/.env.local
 frontend/.env.*.local
 
+# Frontend build tools / hosting
+frontend/.vercel/
+frontend/.cache/
+
 # ---- OS / editor ----
 .DS_Store
 Thumbs.db
