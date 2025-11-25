@@ -15,8 +15,7 @@ origins = [
     "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://cookbook-rag.vercel.app",
-    "https://cookbook-qbt2nembp-3072010s-projects.vercel.app"
+    "https://cookbook-rag.vercel.app"
 ]
 
 app.add_middleware(
