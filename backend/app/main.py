@@ -10,17 +10,17 @@ from app.rag.llm import generate_answer
 app = FastAPI(title="Cookbook RAG API (LangChain)")
 
 # CORS (for when you add a frontend)
-# origins = [
-#     "http://localhost:3000",
-#     "http://127.0.0.1:3000",
-#     "http://localhost:5173",
-#     "http://127.0.0.1:5173",
-#     "https://cookbook-rag.vercel.app"
-# ]
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://cookbook-rag.vercel.app"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],       # for dev; later you can tighten this
+    allow_origins=origins,       # for dev; later you can tighten this
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
