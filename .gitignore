@@ -13,8 +13,7 @@ backend/*.log
 *.env
 backend/.env
 
-# ---- Vector store & generated data ----
-backend/vectorstore/
+# ---- Generated data ----
 backend/data/processed/
 backend/data/**/*.jsonl
 
@@ -29,6 +28,10 @@ frontend/build/
 frontend/.env
 frontend/.env.local
 frontend/.env.*.local
+
+# Frontend build tools / hosting
+frontend/.vercel/
+frontend/.cache/
 
 # ---- OS / editor ----
 .DS_Store

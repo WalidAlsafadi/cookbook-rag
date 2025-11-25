@@ -20,7 +20,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,       # for dev; later you can tighten this
+    allow_origins=["*"],       # for dev; later you can tighten this
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,7 +48,7 @@ def ask(req: AskRequest):
         raise HTTPException(
             status_code=500,
             detail="Server misconfigured: OPENAI_API_KEY is not set. "
-                    "Add it to backend/.env and restart the server.",
+                "Add it to backend/.env and restart the server.",
         )
 
     try:
