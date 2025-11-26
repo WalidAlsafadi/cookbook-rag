@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { BookOpen, Database, Sparkles, Loader2, AlertCircle, Copy, Check, Menu, X, ArrowRight, Search, Github, ArrowUp, Linkedin, Mail } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { 
+  BookOpen, Database, Sparkles, Loader2, AlertCircle, Copy, Check, 
+  Menu, X, ArrowRight, Search, Github, ArrowUp, Linkedin, Mail 
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Image from 'next/image'; 
@@ -11,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
+// --- CONSTANTS ---
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const GITHUB_URL = "https://github.com/WalidAlsafadi/recipa-rag-assistant";
 
@@ -20,7 +24,6 @@ const SUGGESTED_QUESTIONS = [
   "Give me a recipe using only eggs and flour.",
 ];
 
-// --- TEAM DATA ---
 const TEAM_MEMBERS = [
   {
     name: 'Walid Alsafadi',
@@ -48,8 +51,17 @@ const TEAM_MEMBERS = [
   }
 ];
 
+const SECTIONS = [
+  { name: 'Home', id: 'hero' },
+  { name: 'Architecture', id: 'how-it-works' },
+  { name: 'AI Assistant', id: 'qa-section' },
+  { name: 'Team', id: 'team' }
+];
+
 export default function Home() {
   const { toast } = useToast();
+  
+  // State
   const [question, setQuestion] = useState('');
   const [currentAnswer, setCurrentAnswer] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -59,49 +71,68 @@ export default function Home() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // --- Scroll Logic ---
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
+  // Memoize markdown plugins to prevent re-renders during typing
+  const markdownPlugins = useMemo(() => [remarkGfm], []);
 
-      const sections = ['hero', 'how-it-works', 'qa-section', 'team'];
-      for (const id of sections) {
-        const element = document.getElementById(id);
-        if (element) {
-          const rect = element.getBoundingClientRect();
-          if (rect.top <= 150 && rect.bottom >= 150) {
-            setActiveSection(id);
-            break; 
+  // --- Scroll Logic (Throttled) ---
+  useEffect(() => {
+    let ticking = false;
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          // Update navbar background
+          setScrolled(window.scrollY > 50);
+
+          // Update active section spy
+          const sectionIds = ['hero', 'how-it-works', 'qa-section', 'team'];
+          for (const id of sectionIds) {
+            const element = document.getElementById(id);
+            if (element) {
+              const rect = element.getBoundingClientRect();
+              // Adjust offset based on navbar height (~100px)
+              if (rect.top <= 150 && rect.bottom >= 150) {
+                setActiveSection(id);
+                break; 
+              }
+            }
           }
-        }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 
     window.addEventListener('scroll', handleScroll);
-    handleScroll();
+    handleScroll(); // Initial check
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const scrollToSection = (id: string) => {
+  const scrollToSection = useCallback((id: string) => {
     setMobileMenuOpen(false);
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
+      // Manually set it immediately for better UX responsiveness
       setActiveSection(id);
     }
-  };
+  }, []);
 
   // --- Core Logic ---
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!currentAnswer) return;
-    navigator.clipboard.writeText(currentAnswer);
-    setIsCopied(true);
-    toast({
-      title: "Copied",
-      description: "Recipe saved to clipboard.",
-      className: "bg-white border-orange-200 text-orange-900"
-    });
-    setTimeout(() => setIsCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(currentAnswer);
+      setIsCopied(true);
+      toast({
+        title: "Copied",
+        description: "Recipe saved to clipboard.",
+        className: "bg-white border-orange-200 text-orange-900"
+      });
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      toast({ title: "Failed to copy", variant: "destructive" });
+    }
   };
 
   const handleSubmit = async (e?: React.FormEvent, manualQuestion?: string) => {
@@ -132,8 +163,9 @@ export default function Home() {
       setCurrentAnswer(data.answer);
       setQuestion('');
       
+      // Allow DOM to update before scrolling
       setTimeout(() => {
-        document.getElementById('answer-panel')?.scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('answer-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
 
     } catch (err) {
@@ -146,6 +178,7 @@ export default function Home() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Submit on Enter (without Shift)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -162,17 +195,16 @@ export default function Home() {
             <div className="flex items-center gap-3">
                 <span className="font-bold text-xl text-gray-900">Recip<span className="text-orange-600">a</span></span>
             </div>
-            <button onClick={() => setMobileMenuOpen(false)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
+            <button 
+              onClick={() => setMobileMenuOpen(false)} 
+              className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+              aria-label="Close menu"
+            >
                 <X className="h-7 w-7" />
             </button>
           </div>
           <div className="flex flex-col p-6 gap-4 overflow-y-auto">
-            {[
-                { name: 'Home', id: 'hero' },
-                { name: 'Architecture', id: 'how-it-works' },
-                { name: 'AI Assistant', id: 'qa-section' },
-                { name: 'Team', id: 'team' }
-            ].map((item) => (
+            {SECTIONS.map((item) => (
                 <button
                     key={item.name}
                     onClick={() => scrollToSection(item.id)}
@@ -201,43 +233,44 @@ export default function Home() {
       <nav 
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-in-out border-b ${
           scrolled 
-            ? 'bg-black/80 backdrop-blur-xl border-gray-800 py-3 shadow-sm' 
+            ? 'bg-white/90 backdrop-blur-xl border-gray-200 shadow-sm py-3' /* CHANGED: White background when scrolled */
             : 'bg-transparent border-transparent py-4 md:py-8'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             
-            {/* LEFT: Brand Identity (UPDATED: White Text Only, No Logo) */}
+            {/* LEFT: Brand Identity */}
             <div 
               className="flex items-center gap-3 cursor-pointer group w-auto md:w-64" 
               onClick={() => scrollToSection('hero')}
             >
               <div className="flex flex-col">
-                <span className="font-extrabold text-lg md:text-2xl tracking-tight leading-none text-white drop-shadow-md">
+                <span className={`font-extrabold text-lg md:text-2xl tracking-tight leading-none drop-shadow-sm transition-colors duration-300 ${
+                  scrolled ? 'text-slate-900' : 'text-white' /* CHANGED: Text turns dark when scrolled */
+                }`}>
                   Recipa
                 </span>
               </div>
             </div>
 
-            {/* CENTER: Navigation Links (Desktop Only) */}
+            {/* CENTER: Navigation Links (Desktop) */}
             <div className="hidden md:flex items-center justify-center">
               <div className={`flex items-center gap-2 p-2 rounded-full border transition-all duration-300 ${
-                scrolled ? 'bg-gray-900 border-gray-700' : 'bg-black/20 border-white/10 backdrop-blur-md'
+                scrolled 
+                  ? 'bg-gray-100/80 border-gray-200' /* CHANGED: Light pill background */
+                  : 'bg-black/20 border-white/10 backdrop-blur-md'
               }`}>
-                {[
-                  { name: 'Home', id: 'hero' },
-                  { name: 'Architecture', id: 'how-it-works' },
-                  { name: 'AI Assistant', id: 'qa-section' },
-                  { name: 'Team', id: 'team' }
-                ].map((item) => (
+                {SECTIONS.map((item) => (
                   <button
                     key={item.name}
                     onClick={() => scrollToSection(item.id)}
                     className={`px-5 py-2 rounded-full text-base font-bold transition-all duration-300 ${
                       activeSection === item.id 
-                        ? 'bg-orange-500 text-white shadow-lg' 
-                        : 'text-white/90 hover:text-white hover:bg-white/10'
+                        ? 'bg-orange-600 text-white shadow-md' 
+                        : scrolled 
+                            ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50' /* CHANGED: Darker inactive links */
+                            : 'text-white/90 hover:text-white hover:bg-white/10'
                     }`}
                   >
                     {item.name}
@@ -246,7 +279,7 @@ export default function Home() {
               </div>
             </div>
             
-            {/* RIGHT: Actions (Desktop Only) */}
+            {/* RIGHT: Actions (Desktop) */}
             <div className="hidden md:flex items-center gap-4 w-64 justify-end">
               <a 
                 href={GITHUB_URL} 
@@ -254,7 +287,7 @@ export default function Home() {
                 rel="noopener noreferrer"
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-full border transition-all ${
                     scrolled 
-                    ? 'text-white border-gray-600 hover:bg-gray-800' 
+                    ? 'text-slate-900 border-slate-200 hover:bg-slate-50' /* CHANGED: Dark button for white nav */
                     : 'text-white border-white/30 hover:bg-white/10 hover:text-white'
                 }`}
               >
@@ -267,7 +300,12 @@ export default function Home() {
             <div className="md:hidden">
                 <button 
                     onClick={() => setMobileMenuOpen(true)} 
-                    className="p-2 rounded-lg transition-colors text-white hover:bg-white/20"
+                    className={`p-2 rounded-lg transition-colors ${
+                      scrolled 
+                        ? 'text-slate-900 hover:bg-slate-100' 
+                        : 'text-white hover:bg-white/20'
+                    }`}
+                    aria-label="Open menu"
                 >
                     <Menu className="h-8 w-8" />
                 </button>
@@ -308,8 +346,7 @@ export default function Home() {
               size="lg"
               className="bg-orange-600 hover:bg-orange-700 text-white rounded-xl px-8 md:px-12 py-6 md:py-8 text-lg md:text-xl border-2 border-orange-500 shadow-2xl font-bold tracking-wide w-full sm:w-auto"
             >
-              try it now!
-
+              Try It Now!
             </Button>
             <Button
               onClick={() => scrollToSection('how-it-works')}
@@ -323,7 +360,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- HOW IT WORKS (UPDATED: Removed Blank Space) --- */}
+      {/* --- HOW IT WORKS --- */}
       <section id="how-it-works" className="py-16 md:py-32 bg-white border-b border-gray-200 relative overflow-hidden">
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
 
@@ -336,9 +373,8 @@ export default function Home() {
             <p className="text-lg md:text-2xl text-slate-600 max-w-3xl mx-auto leading-relaxed font-medium">
               Leveraging vector embeddings and Large Language Models for precise information retrieval.
             </p>
-          </div>
-
-          {/* DIAGRAM CONTAINER REMOVED HERE TO FIX SPACING */}
+            
+                      </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
             {[
@@ -359,7 +395,6 @@ export default function Home() {
               }
             ].map((item, idx) => (
               <div key={idx} className="p-6 md:p-10 rounded-2xl border border-gray-200 hover:border-orange-300 hover:shadow-xl transition-all duration-300 bg-white group">
-                {/* WHITE FRAME FOR ICON */}
                 <div className="w-12 h-12 md:w-16 md:h-16 bg-white rounded-2xl flex items-center justify-center mb-6 md:mb-8 border border-orange-100 group-hover:bg-orange-600 group-hover:border-orange-600 transition-colors">
                   <item.icon className="h-6 w-6 md:h-8 md:w-8 text-orange-600 group-hover:text-white transition-colors" />
                 </div>
@@ -473,7 +508,7 @@ export default function Home() {
                     prose-headings:font-bold prose-headings:tracking-tight prose-headings:text-gray-900 
                     prose-p:leading-8 prose-p:text-slate-700
                     prose-li:text-slate-700 prose-strong:text-orange-700">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    <ReactMarkdown remarkPlugins={markdownPlugins}>
                       {currentAnswer}
                     </ReactMarkdown>
                   </div>
@@ -499,7 +534,6 @@ export default function Home() {
               <div key={member.name} className="group bg-white p-8 md:p-10 rounded-2xl border border-gray-200 hover:border-orange-300 hover:shadow-2xl transition-all duration-300 text-center relative overflow-hidden flex flex-col items-center">
                 <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
                 
-                {/* WHITE FRAME FOR TEAM PHOTO */}
                 <div className="relative w-32 h-32 md:w-40 md:h-40 mb-6">
                     <div className="absolute inset-0 rounded-full bg-white border-4 border-white shadow-lg overflow-hidden group-hover:border-orange-100 transition-colors">
                         <Image 
@@ -517,13 +551,13 @@ export default function Home() {
                 </div>
                 
                 <div className="flex gap-4 mt-auto">
-                    <a href={member.linkedin} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-[#0077b5] transition-all border border-gray-100 hover:border-[#0077b5]">
+                    <a href={member.linkedin} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-[#0077b5] transition-all border border-gray-100 hover:border-[#0077b5]" aria-label={`${member.name} LinkedIn`}>
                         <Linkedin className="h-5 w-5" />
                     </a>
-                    <a href={member.github} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-[#333] transition-all border border-gray-100 hover:border-[#333]">
+                    <a href={member.github} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-[#333] transition-all border border-gray-100 hover:border-[#333]" aria-label={`${member.name} GitHub`}>
                         <Github className="h-5 w-5" />
                     </a>
-                    <a href={member.email} className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-orange-500 transition-all border border-gray-100 hover:border-orange-500">
+                    <a href={member.email} className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-orange-500 transition-all border border-gray-100 hover:border-orange-500" aria-label={`Email ${member.name}`}>
                         <Mail className="h-5 w-5" />
                     </a>
                 </div>
@@ -534,24 +568,27 @@ export default function Home() {
       </section>
 
       {/* FOOTER */}
-      <footer className="bg-gray-900 border-t border-gray-800 py-12 md:py-20 relative z-10">
+      <footer className="bg-white border-t border-gray-200 py-12 md:py-20 relative z-10">
         <div className="max-w-7xl mx-auto px-6 text-center">
           <div className="inline-flex items-center justify-center mb-6">
-            <span className="text-2xl font-bold text-white tracking-tight">Recipa</span>
+            {/* CHANGED: Footer brand text to dark */}
+            <span className="text-2xl font-bold text-slate-900 tracking-tight">Recipa</span>
           </div>
-          <p className="text-gray-400 text-sm md:text-base max-w-lg mx-auto mb-10 leading-relaxed font-medium">
+          {/* CHANGED: Footer description text to dark gray */}
+          <p className="text-slate-500 text-sm md:text-base max-w-lg mx-auto mb-10 leading-relaxed font-medium">
             A professional RAG demonstration built with precision engineering and culinary passion.
           </p>
           
           <button 
             onClick={() => scrollToSection('hero')}
-            className="mb-8 p-3 bg-gray-800 rounded-full text-gray-400 hover:bg-orange-600 hover:text-white transition-colors inline-block shadow-sm"
+            // CHANGED: Footer button background to light gray
+            className="mb-8 p-3 bg-gray-100 rounded-full text-slate-500 hover:bg-orange-600 hover:text-white transition-colors inline-block shadow-sm"
             aria-label="Scroll to top"
           >
             <ArrowUp className="h-5 w-5" />
           </button>
 
-          <div className="text-xs text-gray-500 font-bold uppercase tracking-widest">
+          <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">
             &copy; 2025 Recipa. All rights reserved.
           </div>
         </div>
