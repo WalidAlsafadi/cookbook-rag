@@ -1,3 +1,4 @@
+from typing import List
 from pathlib import Path
 
 from langchain_openai import OpenAIEmbeddings
