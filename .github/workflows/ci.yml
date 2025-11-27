@@ -2,7 +2,7 @@ name: CI - Recipa AI
 
 on:
   push:
-    branches: ["Faresh/main"]
+    branches: ["main"]
   pull_request:
     branches: ["main"]
 
