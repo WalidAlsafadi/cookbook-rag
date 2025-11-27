@@ -11,3 +11,4 @@ langchain-text-splitters
 chromadb
 python-dotenv
 pypdf
+pytest==8.2.0
