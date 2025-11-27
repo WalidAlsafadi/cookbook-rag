@@ -109,11 +109,21 @@ export default function Home() {
   }, []);
 
   const scrollToSection = useCallback((id: string) => {
+    // This handles closing the menu for internal links
     setMobileMenuOpen(false);
     const element = document.getElementById(id);
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-      // Manually set it immediately for better UX responsiveness
+      // Offset calculation to align top of section under the navbar
+      const headerOffset = 80; 
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
+      
+      // Update active section immediately
       setActiveSection(id);
     }
   }, []);
@@ -165,7 +175,16 @@ export default function Home() {
       
       // Allow DOM to update before scrolling
       setTimeout(() => {
-        document.getElementById('answer-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const answerPanel = document.getElementById('answer-panel');
+        if (answerPanel) {
+            const headerOffset = 100;
+            const elementPosition = answerPanel.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: "smooth"
+            });
+        }
       }, 100);
 
     } catch (err) {
@@ -193,7 +212,9 @@ export default function Home() {
         <div className="fixed inset-0 z-[60] bg-white/95 backdrop-blur-xl animate-in slide-in-from-right-full duration-300 md:hidden flex flex-col">
           <div className="flex justify-between items-center p-6 border-b border-gray-100">
             <div className="flex items-center gap-3">
-                <span className="font-bold text-xl text-gray-900">Recip<span className="text-orange-600">a</span></span>
+                <span className="font-bold text-xl text-gray-900">
+                  Recipa<span className="text-orange-600">AI</span>
+                </span>
             </div>
             <button 
               onClick={() => setMobileMenuOpen(false)} 
@@ -208,7 +229,7 @@ export default function Home() {
                 <button
                     key={item.name}
                     onClick={() => scrollToSection(item.id)}
-                    className={`text-left text-2xl font-bold py-4 border-b border-gray-50 transition-colors ${
+                    className={`w-full flex items-center text-left text-2xl font-bold py-4 border-b border-gray-50 transition-colors ${
                       activeSection === item.id ? 'text-orange-600' : 'text-gray-800 hover:text-orange-600'
                     }`}
                 >
@@ -220,6 +241,7 @@ export default function Home() {
                 href={GITHUB_URL} 
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-3 text-left text-2xl font-bold text-gray-800 py-4 border-b border-gray-50 hover:text-orange-600 transition-colors"
             >
                 <Github className="h-6 w-6" />
@@ -233,7 +255,7 @@ export default function Home() {
       <nav 
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-in-out border-b ${
           scrolled 
-            ? 'bg-white/90 backdrop-blur-xl border-gray-200 shadow-sm py-3' /* CHANGED: White background when scrolled */
+            ? 'bg-white/90 backdrop-blur-xl border-gray-200 shadow-sm py-3' 
             : 'bg-transparent border-transparent py-4 md:py-8'
         }`}
       >
@@ -247,9 +269,9 @@ export default function Home() {
             >
               <div className="flex flex-col">
                 <span className={`font-extrabold text-lg md:text-2xl tracking-tight leading-none drop-shadow-sm transition-colors duration-300 ${
-                  scrolled ? 'text-slate-900' : 'text-white' /* CHANGED: Text turns dark when scrolled */
+                  scrolled ? 'text-slate-900' : 'text-white'
                 }`}>
-                  Recipa
+                  Recipa<span className="text-orange-500">AI</span>
                 </span>
               </div>
             </div>
@@ -258,7 +280,7 @@ export default function Home() {
             <div className="hidden md:flex items-center justify-center">
               <div className={`flex items-center gap-2 p-2 rounded-full border transition-all duration-300 ${
                 scrolled 
-                  ? 'bg-gray-100/80 border-gray-200' /* CHANGED: Light pill background */
+                  ? 'bg-gray-100/80 border-gray-200' 
                   : 'bg-black/20 border-white/10 backdrop-blur-md'
               }`}>
                 {SECTIONS.map((item) => (
@@ -269,7 +291,7 @@ export default function Home() {
                       activeSection === item.id 
                         ? 'bg-orange-600 text-white shadow-md' 
                         : scrolled 
-                            ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50' /* CHANGED: Darker inactive links */
+                            ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50' 
                             : 'text-white/90 hover:text-white hover:bg-white/10'
                     }`}
                   >
@@ -287,7 +309,7 @@ export default function Home() {
                 rel="noopener noreferrer"
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-full border transition-all ${
                     scrolled 
-                    ? 'text-slate-900 border-slate-200 hover:bg-slate-50' /* CHANGED: Dark button for white nav */
+                    ? 'text-slate-900 border-slate-200 hover:bg-slate-50' 
                     : 'text-white border-white/30 hover:bg-white/10 hover:text-white'
                 }`}
               >
@@ -317,9 +339,10 @@ export default function Home() {
       {/* --- HERO SECTION --- */}
       <section 
         id="hero" 
-        className="relative w-full h-screen flex items-center justify-center bg-cover bg-center px-4"
+        className="relative w-full h-screen min-h-screen flex items-center justify-center bg-cover bg-center px-4"
         style={{ 
-          backgroundImage: "url('https://images.unsplash.com/photo-1490645935967-10de6ba17061?q=80&w=2053&auto=format&fit=crop')"
+          // Ensure you have 'hero-bg.jpg' in your public folder
+          backgroundImage: "url('/hero-bg.jpg')" 
         }}
       >
         <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"></div>
@@ -360,8 +383,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- HOW IT WORKS --- */}
-      <section id="how-it-works" className="py-16 md:py-32 bg-white border-b border-gray-200 relative overflow-hidden">
+      {/* --- HOW IT WORKS (Full Page) --- */}
+      {/* ADDED: min-h-screen and flex-col to make it take full view */}
+      <section id="how-it-works" className="min-h-screen flex flex-col justify-center py-16 md:py-32 bg-white border-b border-gray-200 relative overflow-hidden">
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10">
@@ -374,7 +398,7 @@ export default function Home() {
               Leveraging vector embeddings and Large Language Models for precise information retrieval.
             </p>
             
-                      </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
             {[
@@ -406,12 +430,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- Q&A SECTION --- */}
-      <section id="qa-section" className="py-16 md:py-32 bg-gray-50 border-b border-gray-200">
+      {/* --- Q&A SECTION (Full Page) --- */}
+      {/* ADDED: min-h-screen and flex-col to make it take full view */}
+      <section id="qa-section" className="min-h-screen flex flex-col justify-center py-16 md:py-32 bg-gray-50 border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="text-center mb-16 md:mb-20">
             <span className="text-orange-600 font-bold tracking-widest uppercase text-xs md:text-sm mb-4 block">Query Engine</span>
-            <h2 className="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight">Ask Recipa</h2>
+            <h2 className="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight">
+                Ask Recipa<span className="text-orange-600">AI</span>
+            </h2>
           </div>
 
           <div className="max-w-5xl mx-auto space-y-10">
@@ -481,16 +508,6 @@ export default function Home() {
               <Card id="answer-panel" className="border border-gray-200 shadow-lg bg-white rounded-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 ring-1 ring-black/5">
                 <CardHeader className="bg-gray-50 border-b border-gray-200 py-4 md:py-6 px-6 md:px-10 flex flex-row justify-between items-center">
                   <div className="flex items-center gap-3 md:gap-4">
-                      <div className="bg-white p-1.5 md:p-2 rounded-lg border border-gray-200 shadow-sm">
-                        <div className="relative h-6 w-6 md:h-8 md:w-8 rounded-md overflow-hidden">
-                            <Image 
-                                src="/recipa-logo.png" 
-                                alt="Logo" 
-                                fill 
-                                className="object-cover"
-                            />
-                        </div>
-                      </div>
                       <CardTitle className="text-lg md:text-2xl text-gray-900 font-bold">Generated Result</CardTitle>
                   </div>
                   <Button 
@@ -519,8 +536,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- TEAM SECTION --- */}
-      <section id="team" className="py-16 md:py-32 bg-white relative overflow-hidden">
+      {/* --- TEAM SECTION (Full Page) --- */}
+      {/* ADDED: min-h-screen and flex-col to make it take full view */}
+      <section id="team" className="min-h-screen flex flex-col justify-center py-16 md:py-32 bg-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10">
@@ -571,17 +589,16 @@ export default function Home() {
       <footer className="bg-white border-t border-gray-200 py-12 md:py-20 relative z-10">
         <div className="max-w-7xl mx-auto px-6 text-center">
           <div className="inline-flex items-center justify-center mb-6">
-            {/* CHANGED: Footer brand text to dark */}
-            <span className="text-2xl font-bold text-slate-900 tracking-tight">Recipa</span>
+            <span className="text-2xl font-bold text-slate-900 tracking-tight">
+              Recipa<span className="text-orange-600">AI</span>
+            </span>
           </div>
-          {/* CHANGED: Footer description text to dark gray */}
           <p className="text-slate-500 text-sm md:text-base max-w-lg mx-auto mb-10 leading-relaxed font-medium">
             A professional RAG demonstration built with precision engineering and culinary passion.
           </p>
           
           <button 
             onClick={() => scrollToSection('hero')}
-            // CHANGED: Footer button background to light gray
             className="mb-8 p-3 bg-gray-100 rounded-full text-slate-500 hover:bg-orange-600 hover:text-white transition-colors inline-block shadow-sm"
             aria-label="Scroll to top"
           >
@@ -589,7 +606,7 @@ export default function Home() {
           </button>
 
           <div className="text-xs text-slate-400 font-bold uppercase tracking-widest">
-            &copy; 2025 Recipa. All rights reserved.
+            &copy; 2025 RecipaAI. All rights reserved.
           </div>
         </div>
       </footer>

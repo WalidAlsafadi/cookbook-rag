@@ -7,20 +7,22 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | Recipa',
-    // SLOGAN ADDED HERE:
-    default: 'Recipa - Precision Cooking with AI', 
+    // CHANGED: RecipeAI -> RecipaAI
+    template: '%s | RecipaAI',
+    default: 'RecipaAI - Precision Cooking with AI', 
   },
-  description: 'Your professional AI culinary assistant. Unlock recipes, manage ingredients, and cook smarter with Recipa.',
-  keywords: ['Recipa', 'Cookbook', 'AI', 'RAG', 'Next.js', 'Culinary', 'Recipes'],
+  // CHANGED: RecipeAI -> RecipaAI
+  description: 'Your professional AI culinary assistant. Unlock recipes, manage ingredients, and cook smarter with RecipaAI.',
+  // CHANGED: RecipeAI -> RecipaAI
+  keywords: ['RecipaAI', 'Cookbook', 'AI', 'RAG', 'Next.js', 'Culinary', 'Recipes'],
   icons: {
-    // Points to the logo you added to the public folder
-    icon: 'public\recipa-logo.jpg', 
+    // Make sure you renamed your uploaded image to 'logo.png' and put it in the public folder
+    icon: '/logo.png', 
   },
   openGraph: {
-    title: 'Recipa - Precision Cooking with AI',
+    title: 'RecipaAI - Precision Cooking with AI',
     description: 'Your professional AI culinary assistant.',
-    siteName: 'Recipa',
+    siteName: 'RecipaAI',
     type: 'website',
   },
 };
