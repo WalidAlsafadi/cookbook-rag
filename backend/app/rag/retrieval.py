@@ -1,3 +1,4 @@
+from typing import List
 from pathlib import Path
 
 from langchain_openai import OpenAIEmbeddings
@@ -43,8 +44,11 @@ def _get_vectorstore() -> Chroma:
     return vectorstore
 
 
-def retrieve_docs(question: str, k: int = 5) -> list[Document]:
+def retrieve_docs(question: str, k: int = 5) -> List[Document]:
+    """
+    Retrieve top-k documents using the vectorstore retriever.
+    """
     vectorstore = _get_vectorstore()
     retriever = vectorstore.as_retriever(search_kwargs={"k": k})
-    docs: list[Document] = retriever.invoke(question)
+    docs: List[Document] = retriever.invoke(question)
     return docs
