@@ -17,7 +17,10 @@ import {
   ArrowUp,
   Linkedin,
   Mail,
+<<<<<<< Updated upstream
   FlaskConical, // Added for the Demo Badge
+=======
+>>>>>>> Stashed changes
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -102,6 +105,7 @@ export default function Home() {
     };
     window.addEventListener("scroll", handleScroll);
 
+<<<<<<< Updated upstream
     // 2. IntersectionObserver for Active Section (Performance optimized)
     const observerOptions = {
       root: null,
@@ -127,6 +131,30 @@ export default function Home() {
       window.removeEventListener("scroll", handleScroll);
       observer.disconnect();
     };
+=======
+          // Update active section spy
+          const sectionIds = ["hero", "how-it-works", "qa-section", "team"];
+          for (const id of sectionIds) {
+            const element = document.getElementById(id);
+            if (element) {
+              const rect = element.getBoundingClientRect();
+              // Adjust offset based on navbar height (~100px)
+              if (rect.top <= 150 && rect.bottom >= 150) {
+                setActiveSection(id);
+                break;
+              }
+            }
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    handleScroll(); // Initial check
+    return () => window.removeEventListener("scroll", handleScroll);
+>>>>>>> Stashed changes
   }, []);
 
   const scrollToSection = useCallback((id: string) => {
@@ -191,6 +219,10 @@ export default function Home() {
         body: JSON.stringify({
           question: queryText.trim(),
           k: 5,
+<<<<<<< Updated upstream
+=======
+          // Send at most the last 3 Q&A pairs
+>>>>>>> Stashed changes
           history: history.slice(-3),
         }),
       });
@@ -214,10 +246,18 @@ export default function Home() {
             answer: data.answer,
           },
         ];
+<<<<<<< Updated upstream
         return updated.slice(-5);
       });
 
       // Scroll to answer
+=======
+        // Keep only last 5 in the UI history
+        return updated.slice(-5);
+      });
+
+      // Allow DOM to update before scrolling
+>>>>>>> Stashed changes
       setTimeout(() => {
         const answerPanel = document.getElementById('answer-panel');
         if (answerPanel) {
@@ -241,6 +281,10 @@ export default function Home() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+<<<<<<< Updated upstream
+=======
+    // Submit on Enter (without Shift)
+>>>>>>> Stashed changes
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
