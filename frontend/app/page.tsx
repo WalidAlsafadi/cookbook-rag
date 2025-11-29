@@ -17,6 +17,7 @@ import {
   ArrowUp,
   Linkedin,
   Mail,
+  FlaskConical, // Added for the Demo Badge
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -90,64 +91,72 @@ export default function Home() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Memoize markdown plugins to prevent re-renders during typing
+  // Memoize markdown plugins
   const markdownPlugins = useMemo(() => [remarkGfm], []);
 
-  // --- Scroll Logic (Throttled) ---
+  // --- Scroll Logic (Optimized) ---
   useEffect(() => {
-    let ticking = false;
-
+    // 1. Simple listener for Navbar background (lightweight)
     const handleScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          // Update navbar background
-          setScrolled(window.scrollY > 50);
+      setScrolled(window.scrollY > 50);
+    };
+    window.addEventListener("scroll", handleScroll);
 
-          // Update active section spy
-          const sectionIds = ["hero", "how-it-works", "qa-section", "team"];
-          for (const id of sectionIds) {
-            const element = document.getElementById(id);
-            if (element) {
-              const rect = element.getBoundingClientRect();
-              // Adjust offset based on navbar height (~100px)
-              if (rect.top <= 150 && rect.bottom >= 150) {
-                setActiveSection(id);
-                break;
-              }
-            }
-          }
-          ticking = false;
-        });
-        ticking = true;
-      }
+    // 2. IntersectionObserver for Active Section (Performance optimized)
+    const observerOptions = {
+      root: null,
+      rootMargin: "-20% 0px -60% 0px", // Triggers when section is near the top
+      threshold: 0,
     };
 
-    window.addEventListener("scroll", handleScroll);
-    handleScroll(); // Initial check
-    return () => window.removeEventListener("scroll", handleScroll);
+    const observerCallback = (entries: IntersectionObserverEntry[]) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          setActiveSection(entry.target.id);
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(observerCallback, observerOptions);
+    SECTIONS.forEach((section) => {
+      const element = document.getElementById(section.id);
+      if (element) observer.observe(element);
+    });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      observer.disconnect();
+    };
   }, []);
 
   const scrollToSection = useCallback((id: string) => {
-    // This handles closing the menu for internal links
     setMobileMenuOpen(false);
     const element = document.getElementById(id);
     if (element) {
-      // Offset calculation to align top of section under the navbar
-      const headerOffset = 80; 
+      const headerOffset = 80;
       const elementPosition = element.getBoundingClientRect().top;
       const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
 
       window.scrollTo({
         top: offsetPosition,
-        behavior: "smooth"
+        behavior: "smooth",
       });
       
-      // Update active section immediately
+      // Manually set active section to avoid observer lag
       setActiveSection(id);
     }
   }, []);
 
   // --- Core Logic ---
+  // Fix: UseEffect to handle the copy timeout cleanup safely
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    if (isCopied) {
+      timeout = setTimeout(() => setIsCopied(false), 2000);
+    }
+    return () => clearTimeout(timeout);
+  }, [isCopied]);
+
   const handleCopy = async () => {
     if (!currentAnswer) return;
     try {
@@ -158,7 +167,6 @@ export default function Home() {
         description: "Recipe saved to clipboard.",
         className: "bg-white border-orange-200 text-orange-900",
       });
-      setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       toast({ title: "Failed to copy", variant: "destructive" });
     }
@@ -183,7 +191,6 @@ export default function Home() {
         body: JSON.stringify({
           question: queryText.trim(),
           k: 5,
-          // Send at most the last 3 Q&A pairs
           history: history.slice(-3),
         }),
       });
@@ -207,11 +214,10 @@ export default function Home() {
             answer: data.answer,
           },
         ];
-        // Keep only last 5 in the UI history
         return updated.slice(-5);
       });
 
-      // Allow DOM to update before scrolling
+      // Scroll to answer
       setTimeout(() => {
         const answerPanel = document.getElementById('answer-panel');
         if (answerPanel) {
@@ -235,7 +241,6 @@ export default function Home() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Submit on Enter (without Shift)
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -422,8 +427,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- HOW IT WORKS (Full Page) --- */}
-      {/* ADDED: min-h-screen and flex-col to make it take full view */}
+      {/* --- HOW IT WORKS --- */}
       <section id="how-it-works" className="min-h-screen flex flex-col justify-center py-16 md:py-32 bg-white border-b border-gray-200 relative overflow-hidden">
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
 
@@ -477,15 +481,25 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- Q&A SECTION (Full Page) --- */}
-      {/* ADDED: min-h-screen and flex-col to make it take full view */}
+      {/* --- Q&A SECTION --- */}
       <section id="qa-section" className="min-h-screen flex flex-col justify-center py-16 md:py-32 bg-gray-50 border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="text-center mb-16 md:mb-20">
-            <span className="text-orange-600 font-bold tracking-widest uppercase text-xs md:text-sm mb-4 block">Query Engine</span>
+            
+            {/* DEMO BADGE */}
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-xs md:text-sm font-bold uppercase tracking-widest mb-6 shadow-sm">
+              <FlaskConical className="h-4 w-4" />
+              <span>Research Preview</span>
+            </div>
+
             <h2 className="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight">
                 Ask Recipa<span className="text-orange-600">AI</span>
             </h2>
+
+            {/* DEMO SUBTITLE */}
+            <p className="mt-6 text-slate-500 max-w-2xl mx-auto text-sm md:text-base leading-relaxed">
+              This is a live demonstration. Occasional inaccuracies or latency may occur as we fine-tune the model.
+            </p>
           </div>
 
           <div className="max-w-5xl mx-auto space-y-10">
@@ -555,6 +569,14 @@ export default function Home() {
                       </>
                     )}
                   </Button>
+
+                  {/* DISCLAIMER FOOTNOTE */}
+                  <p className="text-xs text-center text-slate-400 font-medium pt-2">
+                    RecipaAI may display inaccurate info, including about ingredients or safety. 
+                    <br className="hidden sm:block" />
+                    Please verify recipes before cooking.
+                  </p>
+
                 </form>
               </CardContent>
             </Card>
@@ -600,8 +622,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- TEAM SECTION (Full Page) --- */}
-      {/* ADDED: min-h-screen and flex-col to make it take full view */}
+      {/* --- TEAM SECTION --- */}
       <section id="team" className="min-h-screen flex flex-col justify-center py-16 md:py-32 bg-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-[0.02] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
 
