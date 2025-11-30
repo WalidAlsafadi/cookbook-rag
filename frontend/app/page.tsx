@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
+
 import {
   BookOpen,
   Database,
@@ -165,7 +173,15 @@ export default function Home() {
     }
   };
 
-  const handleSubmit = async (e?: React.FormEvent, manualQuestion?: string) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Submit on Enter (without Shift)
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
+  const handleSubmit = async (e?: FormEvent, manualQuestion?: string) => {
     if (e) e.preventDefault();
     const queryText = manualQuestion || question;
 
@@ -176,6 +192,8 @@ export default function Home() {
 
     setIsLoading(true);
     setError("");
+    setCurrentAnswer("");
+    setIsCopied(false);
 
     try {
       const response = await fetch(`${API_BASE_URL}/ask`, {
@@ -183,64 +201,86 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: queryText.trim(),
-          k: 5,
+          k: 3,
           // Send at most the last 3 Q&A pairs
           history: history.slice(-3),
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(
-          errorData?.detail || `Request failed: ${response.status}`
-        );
+        // errors still come back as JSON from FastAPI
+        let errorMsg = `Request failed: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.detail) errorMsg = errorData.detail;
+        } catch {
+          // ignore JSON parse errors on error path
+        }
+        throw new Error(errorMsg);
       }
 
-      const data = await response.json();
-      setCurrentAnswer(data.answer);
+      if (!response.body) {
+        throw new Error("Streaming is not supported in this browser.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let hasScrolled = false;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        if (!chunk) continue;
+
+        fullText += chunk;
+        setCurrentAnswer(fullText); // update UI progressively
+
+        if (!hasScrolled) {
+          hasScrolled = true;
+          setTimeout(() => {
+            const answerPanel = document.getElementById("answer-panel");
+            if (answerPanel) {
+              const headerOffset = 100;
+              const elementPosition = answerPanel.getBoundingClientRect().top;
+              const offsetPosition =
+                elementPosition + window.pageYOffset - headerOffset;
+              window.scrollTo({
+                top: offsetPosition,
+                behavior: "smooth",
+              });
+            }
+          }, 50);
+        }
+      }
+
+      // clear input
       setQuestion("");
 
+      // update history with the full streamed answer
       setHistory((prev) => {
         const updated = [
           ...prev,
           {
             question: queryText.trim(),
-            answer: data.answer,
+            answer: fullText,
           },
         ];
-        // Keep only last 5 in the UI history
-        return updated.slice(-5);
+        return updated.slice(-5); // keep last 5
       });
-
-      // Allow DOM to update before scrolling
-      setTimeout(() => {
-        const answerPanel = document.getElementById("answer-panel");
-        if (answerPanel) {
-          const headerOffset = 100;
-          const elementPosition = answerPanel.getBoundingClientRect().top;
-          const offsetPosition =
-            elementPosition + window.pageYOffset - headerOffset;
-          window.scrollTo({
-            top: offsetPosition,
-            behavior: "smooth",
-          });
-        }
-      }, 100);
     } catch (err) {
       const errorMsg =
         err instanceof Error ? err.message : "Something went wrong.";
       setError(errorMsg);
-      toast({ variant: "destructive", title: "Error", description: errorMsg });
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: errorMsg,
+      });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Submit on Enter (without Shift)
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
     }
   };
 

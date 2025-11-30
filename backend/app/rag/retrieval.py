@@ -2,8 +2,9 @@ from typing import List, Optional
 from pathlib import Path
 
 from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_core.documents import Document
+from functools import lru_cache
 
 from app.config import VECTORSTORE_DIR, get_settings
 
@@ -26,7 +27,12 @@ def _ensure_vectorstore_ready() -> None:
             "Run `python -m scripts.run_ingest` from the backend/ folder first."
         )
 
+@lru_cache
 def _get_vectorstore() -> Chroma:
+    """
+    Build the Chroma vector store once and cache it in-memory.
+    Subsequent requests reuse the same instance.
+    """
     _ensure_vectorstore_ready()
 
     embeddings = OpenAIEmbeddings(
@@ -34,12 +40,11 @@ def _get_vectorstore() -> Chroma:
         api_key=_settings.openai_api_key,
     )
 
-    vectorstore = Chroma(
+    return Chroma(
         embedding_function=embeddings,
         persist_directory=str(VECTORSTORE_DIR),
         collection_name=_settings.chroma_collection,
     )
-    return vectorstore
 
 
 def retrieve_docs(question: str, k: int = 5) -> List[Document]:
