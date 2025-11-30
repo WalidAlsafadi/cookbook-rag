@@ -1,13 +1,9 @@
 "use client";
 
-import {
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-  type FormEvent,
-  type KeyboardEvent,
-} from "react";
+"use client";
+
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 
 import {
   BookOpen,
