@@ -8,44 +8,56 @@ from app.config import get_settings
 
 _settings = get_settings()
 
-# LangChain Chat model
+# Max characters of cookbook context to send per request
+MAX_CONTEXT_CHARS = 8000
+
+# Single Chat model instance (streaming enabled so we can use .stream())
 _llm = ChatOpenAI(
     model=_settings.chat_model,
     api_key=_settings.openai_api_key,
+    temperature=0.2,
+    streaming=True,
 )
 
-# Prompt template for RAG with short conversation history
+# Prompt template for RecipaAI RAG with short conversation history
 _prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "You are a helpful cooking assistant for the book 'The Low-Cost Cookbook'. "
-            "You ONLY answer using the provided cookbook context.\n\n"
-            "Conversation rules:\n"
-            "- Each request you see may include up to a few previous Q&A pairs as history, "
-            "  but you do NOT have long-term memory beyond what is shown.\n"
-            "- Use the history to resolve references like 'the first one', 'that recipe', "
-            "  'it', 'that one', or 'the previous one'.\n"
-            "- If the reference is still ambiguous, explicitly ask the user to repeat the "
-            "  recipe name or question instead of guessing.\n\n"
-            "Answer style rules:\n"
-            "- Default to concise answers (2–5 short sentences or a short bullet list).\n"
-            "- Only give full step-by-step recipe instructions or complete ingredient lists "
-            "  when the user clearly asks for a recipe or says things like 'how do I make…', "
-            "  'give me the recipe', or 'step by step'.\n"
-            "- If the user just greets you (e.g. 'hi', 'hello') or asks something very vague, "
-            "  reply with one very short line and invite them to ask a specific question about "
-            "  the cookbook. Do NOT output any recipe details in that case.\n"
-            "- Do NOT invent information that is not in the provided context.\n"
-            "- If the answer is not found in the context, say you don't know.\n"
-            "- Format all answers in clean Markdown and use headings and bullet/numbered lists "
-            "  only when they are genuinely helpful.",
+            (
+                "You are RecipaAI, a helpful cooking assistant for the book "
+                "'The Low-Cost Cookbook'.\n"
+                "Your ONLY source of factual information is the provided cookbook "
+                "context.\n\n"
+                "Conversation rules:\n"
+                "- Each request you see may include up to a few previous Q&A pairs "
+                "  as history, but you do NOT have long-term memory beyond what is shown.\n"
+                "- Use the history to resolve references like 'the first one', "
+                "  'that recipe', 'it', 'that one', or 'the previous one'.\n"
+                "- If the reference is still ambiguous, explicitly ask the user to "
+                "  repeat the recipe name or question instead of guessing.\n\n"
+                "Answer style rules:\n"
+                "- Default to concise answers (1–3 short sentences or a short bullet list).\n"
+                "- Only give full step-by-step recipe instructions or complete "
+                "  ingredient lists when the user clearly asks for a recipe or says "
+                "  things like 'how do I make…', 'give me the recipe', or 'step by step'.\n"
+                "- If the user just greets you (e.g. 'hi', 'hello') or asks something "
+                "  very vague, reply with one very short line and invite them to ask a "
+                "  specific question about the cookbook. Do NOT output any recipe "
+                "  details in that case.\n"
+                "- Do NOT invent information that is not in the provided context.\n"
+                "- If the answer is not found in the context, say you don't know.\n"
+                "- Format all answers in clean Markdown and use headings and bullet/"
+                "  numbered lists only when they are genuinely helpful."
+            ),
         ),
         (
             "user",
-            "Conversation history (most recent last):\n{history}\n\n"
-            "User question: {question}\n\n"
-            "Context:\n{context}",
+            (
+                "Conversation history (most recent last):\n{history}\n\n"
+                "User question: {question}\n\n"
+                "Cookbook context:\n{context}"
+            ),
         ),
     ]
 )
@@ -60,8 +72,7 @@ def _build_history_text(history: Optional[List[Dict[str, Any]]]) -> str:
     if not history:
         return "No previous conversation."
 
-    # Take at most the last 3 entries (even if frontend already trimmed)
-    recent = history[-3:]
+    recent = history[-3:]  # at most last 3 entries
     lines: List[str] = []
 
     for entry in recent:
@@ -77,21 +88,30 @@ def _build_history_text(history: Optional[List[Dict[str, Any]]]) -> str:
     return "\n\n".join(lines)
 
 
+def _build_context_text(docs: List[Document]) -> str:
+    """
+    Join document contents into a single context string and truncate
+    to MAX_CONTEXT_CHARS to avoid huge prompts.
+    """
+    if not docs:
+        return "No relevant context found in the cookbook."
+
+    context_text = "\n\n".join(d.page_content for d in docs)
+    if len(context_text) > MAX_CONTEXT_CHARS:
+        context_text = context_text[:MAX_CONTEXT_CHARS]
+    return context_text
+
+
 def generate_answer(
     question: str,
     docs: List[Document],
     history: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """
-    Use LangChain ChatOpenAI + prompt template to answer from documents,
-    optionally using a short conversation history (for references like
-    'the first one').
+    Non-streaming helper: returns the full answer as a string.
+    Still useful for debugging, tests, or any non-streaming use.
     """
-    if not docs:
-        context_text = "No relevant context found in the cookbook."
-    else:
-        context_text = "\n\n".join(d.page_content for d in docs)
-
+    context_text = _build_context_text(docs)
     history_text = _build_history_text(history)
 
     chain = _prompt | _llm
@@ -103,3 +123,29 @@ def generate_answer(
         }
     )
     return result.content
+
+
+def stream_answer(
+    question: str,
+    docs: List[Document],
+    history: Optional[List[Dict[str, Any]]] = None,
+):
+    """
+    Streaming helper: yields text chunks as they are generated by the LLM.
+    Used by the /ask endpoint in main.py with StreamingResponse.
+    """
+    context_text = _build_context_text(docs)
+    history_text = _build_history_text(history)
+
+    chain = _prompt | _llm
+
+    for chunk in chain.stream(
+        {
+            "question": question,
+            "context": context_text,
+            "history": history_text,
+        }
+    ):
+        text = getattr(chunk, "content", None)
+        if text:
+            yield text

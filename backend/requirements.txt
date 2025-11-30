@@ -6,6 +6,7 @@ langchain
 langchain-community
 langchain-openai
 langchain-text-splitters
+langchain-chroma
 
 # Vector store + utils
 chromadb

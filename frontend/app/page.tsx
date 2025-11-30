@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
+
 import {
   BookOpen,
   Database,
@@ -90,16 +92,18 @@ export default function Home() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Memoize markdown plugins
+  // Memoize markdown plugins to prevent re-renders during typing
   const markdownPlugins = useMemo(() => [remarkGfm], []);
 
-  // --- Scroll Logic (Optimized) ---
+  // --- Scroll Logic (Throttled) ---
   useEffect(() => {
-    // 1. Simple listener for Navbar background (lightweight)
+    let ticking = false;
+
     const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
-    };
-    window.addEventListener("scroll", handleScroll);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          // Update navbar background
+          setScrolled(window.scrollY > 50);
 
           // Update active section spy
           const sectionIds = ["hero", "how-it-works", "qa-section", "team"];
@@ -126,6 +130,7 @@ export default function Home() {
   }, []);
 
   const scrollToSection = useCallback((id: string) => {
+    // This handles closing the menu for internal links
     setMobileMenuOpen(false);
     const element = document.getElementById(id);
     if (element) {
@@ -146,15 +151,6 @@ export default function Home() {
   }, []);
 
   // --- Core Logic ---
-  // Fix: UseEffect to handle the copy timeout cleanup safely
-  useEffect(() => {
-    let timeout: NodeJS.Timeout;
-    if (isCopied) {
-      timeout = setTimeout(() => setIsCopied(false), 2000);
-    }
-    return () => clearTimeout(timeout);
-  }, [isCopied]);
-
   const handleCopy = async () => {
     if (!currentAnswer) return;
     try {
@@ -165,12 +161,24 @@ export default function Home() {
         description: "Recipe saved to clipboard.",
         className: "bg-white border-orange-200 text-orange-900",
       });
-    } catch (err) {
-      toast({ title: "Failed to copy", variant: "destructive" });
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch {
+      toast({
+        title: "Failed to copy",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleSubmit = async (e?: React.FormEvent, manualQuestion?: string) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Submit on Enter (without Shift)
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
+  const handleSubmit = async (e?: FormEvent, manualQuestion?: string) => {
     if (e) e.preventDefault();
     const queryText = manualQuestion || question;
 
@@ -181,71 +189,99 @@ export default function Home() {
 
     setIsLoading(true);
     setError("");
+    setCurrentAnswer("");
+    setIsCopied(false);
 
     try {
       const response = await fetch(`${API_BASE_URL}/ask`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           question: queryText.trim(),
-          k: 5,
+          k: 3,
           // Send at most the last 3 Q&A pairs
           history: history.slice(-3),
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(
-          errorData?.detail || `Request failed: ${response.status}`
-        );
+        // errors still come back as JSON from FastAPI
+        let errorMsg = `Request failed: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.detail) errorMsg = errorData.detail;
+        } catch {
+          // ignore JSON parse errors on error path
+        }
+        throw new Error(errorMsg);
       }
 
-      const data = await response.json();
-      setCurrentAnswer(data.answer);
+      if (!response.body) {
+        throw new Error("Streaming is not supported in this browser.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let hasScrolled = false;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, {
+          stream: true,
+        });
+        if (!chunk) continue;
+
+        fullText += chunk;
+        setCurrentAnswer(fullText); // update UI progressively
+
+        if (!hasScrolled) {
+          hasScrolled = true;
+          setTimeout(() => {
+            const answerPanel = document.getElementById("answer-panel");
+            if (answerPanel) {
+              const headerOffset = 100;
+              const elementPosition = answerPanel.getBoundingClientRect().top;
+              const offsetPosition =
+                elementPosition + window.pageYOffset - headerOffset;
+              window.scrollTo({
+                top: offsetPosition,
+                behavior: "smooth",
+              });
+            }
+          }, 50);
+        }
+      }
+
+      // clear input
       setQuestion("");
 
+      // update history with the full streamed answer
       setHistory((prev) => {
         const updated = [
           ...prev,
           {
             question: queryText.trim(),
-            answer: data.answer,
+            answer: fullText,
           },
         ];
-        // Keep only last 5 in the UI history
-        return updated.slice(-5);
+        return updated.slice(-5); // keep last 5
       });
-
-      // Allow DOM to update before scrolling
-      setTimeout(() => {
-        const answerPanel = document.getElementById("answer-panel");
-        if (answerPanel) {
-          const headerOffset = 100;
-          const elementPosition = answerPanel.getBoundingClientRect().top;
-          const offsetPosition =
-            elementPosition + window.pageYOffset - headerOffset;
-          window.scrollTo({
-            top: offsetPosition,
-            behavior: "smooth",
-          });
-        }
-      }, 100);
     } catch (err) {
       const errorMsg =
         err instanceof Error ? err.message : "Something went wrong.";
       setError(errorMsg);
-      toast({ variant: "destructive", title: "Error", description: errorMsg });
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: errorMsg,
+      });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Submit on Enter (without Shift)
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
     }
   };
 
@@ -257,7 +293,8 @@ export default function Home() {
           <div className="flex justify-between items-center p-6 border-b border-gray-100">
             <div className="flex items-center gap-3">
               <span className="font-bold text-xl text-gray-900">
-                Recipa<span className="text-orange-600">AI</span>
+                Recipa
+                <span className="text-orange-600">AI</span>
               </span>
             </div>
             <button
@@ -318,7 +355,8 @@ export default function Home() {
                     scrolled ? "text-slate-900" : "text-white"
                   }`}
                 >
-                  Recipa<span className="text-orange-500">AI</span>
+                  Recipa
+                  <span className="text-orange-500">AI</span>
                 </span>
               </div>
             </div>
@@ -390,11 +428,10 @@ export default function Home() {
         id="hero"
         className="relative w-full h-screen min-h-screen flex items-center justify-center bg-cover bg-center px-4"
         style={{
-          // Ensure you have 'hero-bg.jpg' in your public folder
           backgroundImage: "url('/hero-bg.jpg')",
         }}
       >
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"></div>
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" />
 
         <div className="relative z-10 text-center max-w-6xl mx-auto flex flex-col items-center">
           <div className="inline-flex items-center gap-2 md:gap-3 mb-6 md:mb-10 px-4 md:px-6 py-2 md:py-2.5 rounded-full bg-white/10 backdrop-blur-md border border-white/30 text-white text-xs md:text-sm font-bold uppercase tracking-widest shadow-2xl animate-in fade-in zoom-in duration-1000">
@@ -436,7 +473,6 @@ export default function Home() {
       </section>
 
       {/* --- HOW IT WORKS (Full Page) --- */}
-      {/* ADDED: min-h-screen and flex-col to make it take full view */}
       <section
         id="how-it-works"
         className="min-h-screen flex flex-col justify-center py-16 md:py-32 bg-white border-b border-gray-200 relative overflow-hidden"
@@ -447,14 +483,14 @@ export default function Home() {
             backgroundImage: "radial-gradient(#000 1px, transparent 1px)",
             backgroundSize: "32px 32px",
           }}
-        ></div>
+        />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10">
           <div className="text-center mb-16 md:mb-24">
             <h2 className="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight mb-4 md:mb-6">
               System Architecture
             </h2>
-            <div className="w-24 md:w-32 h-2 bg-orange-500 mx-auto mb-6 md:mb-8 rounded-full"></div>
+            <div className="w-24 md:w-32 h-2 bg-orange-500 mx-auto mb-6 md:mb-8 rounded-full" />
             <p className="text-lg md:text-2xl text-slate-600 max-w-3xl mx-auto leading-relaxed font-medium">
               Leveraging vector embeddings and Large Language Models for precise
               information retrieval.
@@ -499,7 +535,6 @@ export default function Home() {
       </section>
 
       {/* --- Q&A SECTION (Full Page) --- */}
-      {/* ADDED: min-h-screen and flex-col to make it take full view */}
       <section
         id="qa-section"
         className="min-h-screen flex flex-col justify-center py-16 md:py-32 bg-gray-50 border-b border-gray-200"
@@ -510,18 +545,14 @@ export default function Home() {
               Query Engine
             </span>
             <h2 className="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight">
-              Ask Recipa<span className="text-orange-600">AI</span>
+              Ask Recipa
+              <span className="text-orange-600">AI</span>
             </h2>
-
-            {/* DEMO SUBTITLE */}
-            <p className="mt-6 text-slate-500 max-w-2xl mx-auto text-sm md:text-base leading-relaxed">
-              This is a live demonstration. Occasional inaccuracies or latency may occur as we fine-tune the model.
-            </p>
           </div>
 
           <div className="max-w-5xl mx-auto space-y-10">
             <Card className="border border-gray-200 shadow-xl bg-white rounded-2xl overflow-hidden hover:shadow-2xl transition-shadow duration-500">
-              <div className="h-3 bg-orange-500 w-full"></div>
+              <div className="h-3 bg-orange-500 w-full" />
               <CardContent className="p-6 md:p-12">
                 <form
                   onSubmit={(e) => handleSubmit(e)}
@@ -559,8 +590,8 @@ export default function Home() {
 
                   {error && (
                     <Alert
-                      variant="destructive"
                       className="rounded-xl border-red-200 bg-red-50"
+                      variant="destructive"
                     >
                       <AlertCircle className="h-5 w-5" />
                       <AlertDescription className="text-base font-medium">
@@ -586,14 +617,6 @@ export default function Home() {
                       </>
                     )}
                   </Button>
-
-                  {/* DISCLAIMER FOOTNOTE */}
-                  <p className="text-xs text-center text-slate-400 font-medium pt-2">
-                    RecipaAI may display inaccurate info, including about ingredients or safety. 
-                    <br className="hidden sm:block" />
-                    Please verify recipes before cooking.
-                  </p>
-
                 </form>
               </CardContent>
             </Card>
@@ -642,7 +665,6 @@ export default function Home() {
       </section>
 
       {/* --- TEAM SECTION (Full Page) --- */}
-      {/* ADDED: min-h-screen and flex-col to make it take full view */}
       <section
         id="team"
         className="min-h-screen flex flex-col justify-center py-16 md:py-32 bg-white relative overflow-hidden"
@@ -653,14 +675,14 @@ export default function Home() {
             backgroundImage: "radial-gradient(#000 1px, transparent 1px)",
             backgroundSize: "32px 32px",
           }}
-        ></div>
+        />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10">
           <div className="text-center mb-16 md:mb-24">
             <h2 className="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight mb-4">
               Engineering Team
             </h2>
-            <div className="w-24 h-1.5 bg-orange-500 mx-auto"></div>
+            <div className="w-24 h-1.5 bg-orange-500 mx-auto" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
@@ -669,7 +691,7 @@ export default function Home() {
                 key={member.name}
                 className="group bg-white p-8 md:p-10 rounded-2xl border border-gray-200 hover:border-orange-300 hover:shadow-2xl transition-all duration-300 text-center relative overflow-hidden flex flex-col items-center"
               >
-                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
+                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
 
                 <div className="relative w-32 h-32 md:w-40 md:h-40 mb-6">
                   <div className="absolute inset-0 rounded-full bg-white border-4 border-white shadow-lg overflow-hidden group-hover:border-orange-100 transition-colors">
