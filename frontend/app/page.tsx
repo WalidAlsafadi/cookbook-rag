@@ -548,6 +548,10 @@ export default function Home() {
               Ask Recipa
               <span className="text-orange-600">AI</span>
             </h2>
+            {/* Minimal disclaimer */}
+            <p className="mt-4 text-s text-slate-400 text-center">
+              RecipaAI may make mistakes.
+            </p>
           </div>
 
           <div className="max-w-5xl mx-auto space-y-10">
